@@ -73,9 +73,9 @@ impl<
     pub fn set_results(&mut self, mut results: Vec<TResult>) -> Result<(), String> {
         if results.len() != self.amount {
             return Err(format!(
-                "amount of results {} != amount of requests {}",
+                "amount of results [{}] != amount of requests [{}]",
                 results.len(),
-                self.completions.len()
+                self.amount
             ));
         }
 
