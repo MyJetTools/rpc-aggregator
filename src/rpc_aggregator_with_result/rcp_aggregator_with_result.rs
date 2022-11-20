@@ -133,6 +133,23 @@ impl<
         Ok(result.remove(0))
     }
 
+    pub async fn execute_request_with_transformation<TOut, TFn: Fn(TResult) -> TOut>(
+        &self,
+        data: TItem,
+        tranform: TFn,
+        #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
+    ) -> Result<TOut, Arc<TError>> {
+        let result = self
+            .execute_request(
+                data,
+                #[cfg(feature = "with-telemetry")]
+                my_telemetry,
+            )
+            .await?;
+
+        Ok(tranform(result))
+    }
+
     pub async fn execute_multi_requests(
         &self,
         data: Vec<TItem>,
@@ -171,6 +188,29 @@ impl<
         }
 
         awaiter.get_result().await
+    }
+
+    pub async fn execute_multi_requests_with_transofrmation<TOut, TFn: Fn(TResult) -> TOut>(
+        &self,
+        data: Vec<TItem>,
+        tranform: TFn,
+        #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
+    ) -> Result<Vec<TOut>, Arc<TError>> {
+        let response = self
+            .execute_multi_requests(
+                data,
+                #[cfg(feature = "with-telemetry")]
+                my_telemetry,
+            )
+            .await?;
+
+        let mut result = Vec::with_capacity(response.len());
+
+        for item in response {
+            result.push(tranform(item));
+        }
+
+        Ok(result)
     }
 }
 
