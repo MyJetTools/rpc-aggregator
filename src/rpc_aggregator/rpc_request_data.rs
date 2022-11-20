@@ -2,36 +2,24 @@ use std::sync::Arc;
 
 use rust_extensions::TaskCompletion;
 
-pub struct Request<
-    TItem: Send + Sync + 'static,
-    TResult: Send + Sync + 'static,
-    TError: Send + Sync + 'static,
-> {
+pub struct Request<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> {
     pub request_data: Vec<TItem>,
-    pub completion: TaskCompletion<TResult, Arc<TError>>,
+    pub completion: TaskCompletion<(), Arc<TError>>,
+
     #[cfg(feature = "with-telemetry")]
     pub my_telemetry: my_telemetry::MyTelemetryContext,
 }
 
-pub struct RcpRequestData<
-    TItem: Send + Sync + 'static,
-    TResult: Send + Sync + 'static,
-    TError: Send + Sync + 'static,
-> {
+pub struct RcpRequestData<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> {
     data: Option<Vec<TItem>>,
-    completions: Vec<TaskCompletion<TResult, Arc<TError>>>,
+    completions: Vec<TaskCompletion<(), Arc<TError>>>,
     #[cfg(feature = "with-telemetry")]
     my_telemetry: Option<my_telemetry::MyTelemetryContext>,
 }
 
-impl<
-        TItem: Send + Sync + 'static,
-        TResult: Send + Sync + 'static,
-        TError: Send + Sync + 'static,
-    > RcpRequestData<TItem, TResult, TError>
-{
+impl<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> RcpRequestData<TItem, TError> {
     pub fn new(
-        requests: Vec<Request<TItem, TResult, TError>>,
+        requests: Vec<Request<TItem, TError>>,
         #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
     ) -> Self {
         let mut data = Vec::new();
@@ -63,32 +51,12 @@ impl<
         Arc::new(new_result.unwrap())
     }
 
-    pub fn set_results(&mut self, mut results: Vec<TResult>) -> Result<(), String> {
-        if results.len() != self.completions.len() {
-            return Err(format!(
-                "amount of results {} != amount of requests {}",
-                results.len(),
-                self.completions.len()
-            ));
-        }
-
+    pub fn set_result(&mut self) -> Result<(), String> {
         for completion in &mut self.completions {
-            let result = results.remove(0);
-            if let Err(err) = completion.try_set_ok(result) {
-                println!("can not set result: {:?}", err);
+            if let Err(err) = completion.try_set_ok(()) {
+                println!("Can not set Ok result to the task completion. {:?}", err);
             }
         }
-
-        Ok(())
-    }
-
-    pub fn set_result<TFn: Fn() -> TResult>(&mut self, result: TFn) -> Result<(), String> {
-        for completion in &mut self.completions {
-            if let Err(err) = completion.try_set_ok(result()) {
-                println!("can not set result: {:?}", err);
-            }
-        }
-
         Ok(())
     }
 

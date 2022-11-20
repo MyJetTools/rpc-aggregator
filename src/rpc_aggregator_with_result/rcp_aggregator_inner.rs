@@ -1,4 +1,4 @@
-use crate::rpc_request_data::Request;
+use super::rpc_request_data::Request;
 
 pub struct RpcAggregatorInner<
     TItem: Send + Sync + 'static,

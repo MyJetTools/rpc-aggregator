@@ -2,12 +2,13 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use tokio::sync::Mutex;
 
-use crate::{
+use crate::RpcAggregatorWithResultCallback;
+use rust_extensions::{ApplicationStates, Logger, TaskCompletion};
+
+use super::{
     rcp_aggregator_inner::RpcAggregatorInner,
     rpc_request_data::{RcpRequestData, Request},
-    RpcAggregatorWithResultCallback,
 };
-use rust_extensions::{ApplicationStates, Logger, TaskCompletion};
 
 pub struct RpcAggregatorWithResult<
     TItem: Send + Sync + 'static,
@@ -127,14 +128,16 @@ impl<
             );
         }
 
-        task_await.get_result().await
+        let mut result = task_await.get_result().await?;
+
+        Ok(result.remove(0))
     }
 
     pub async fn execute_multi_requests(
         &self,
         data: Vec<TItem>,
         #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
-    ) -> Vec<Result<TResult, Arc<TError>>> {
+    ) -> Result<Vec<TResult>, Arc<TError>> {
         if self.app_states.is_shutting_down() {
             panic!(
                 "Can not publish to RoundTripPusher {} when shutting down",
@@ -142,23 +145,18 @@ impl<
             );
         }
 
-        let mut awaiters = Vec::with_capacity(data.len());
+        let mut event = Request {
+            request_data: data,
+            completion: TaskCompletion::new(),
+            #[cfg(feature = "with-telemetry")]
+            my_telemetry,
+        };
+
+        let awaiter = event.completion.get_awaiter();
 
         {
             let mut write_access = self.inner.0.lock().await;
-
-            let mut event = Request {
-                request_data: data,
-                completion: TaskCompletion::new(),
-                #[cfg(feature = "with-telemetry")]
-                my_telemetry,
-            };
-
-            let task_await = event.completion.get_awaiter();
             write_access.queue.push(event);
-
-            awaiters.push(task_await);
-
             self.inner.1.store(
                 write_access.queue.len(),
                 std::sync::atomic::Ordering::SeqCst,
@@ -172,13 +170,7 @@ impl<
             );
         }
 
-        let mut result = Vec::with_capacity(awaiters.len());
-
-        for awaiter in awaiters {
-            result.push(awaiter.get_result().await);
-        }
-
-        result
+        awaiter.get_result().await
     }
 }
 

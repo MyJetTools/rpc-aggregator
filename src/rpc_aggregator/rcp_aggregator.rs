@@ -6,14 +6,15 @@ use std::{
 use rust_extensions::{ApplicationStates, Logger, TaskCompletion};
 use tokio::sync::Mutex;
 
-use crate::{
+use crate::RpcAggregatorCallback;
+
+use super::{
     rcp_aggregator_inner::RpcAggregatorInner,
     rpc_request_data::{RcpRequestData, Request},
-    RpcAggregatorCallback,
 };
 
 pub struct RpcAggregator<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> {
-    inner: Arc<(Mutex<RpcAggregatorInner<TItem, (), TError>>, AtomicUsize)>,
+    inner: Arc<(Mutex<RpcAggregatorInner<TItem, TError>>, AtomicUsize)>,
     sender: tokio::sync::mpsc::UnboundedSender<()>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
     name: String,
@@ -186,7 +187,7 @@ impl<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> RpcAggregator<
 
 async fn read_loop<TItem: Send + Sync + 'static, TError: Send + Sync + 'static>(
     name: String,
-    inner: Arc<(Mutex<RpcAggregatorInner<TItem, (), TError>>, AtomicUsize)>,
+    inner: Arc<(Mutex<RpcAggregatorInner<TItem, TError>>, AtomicUsize)>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
     callback: Arc<dyn RpcAggregatorCallback<TItem, TError> + Send + Sync + 'static>,
     max_amount_per_round_trip: usize,
@@ -322,7 +323,7 @@ async fn read_loop<TItem: Send + Sync + 'static, TError: Send + Sync + 'static>(
 
                 match result.unwrap() {
                     Ok(_) => {
-                        if let Err(message) = to_publish.set_result(|| ()) {
+                        if let Err(message) = to_publish.set_result() {
                             to_publish.set_panic(message.as_str());
                         }
                         break;
