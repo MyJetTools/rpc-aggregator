@@ -7,7 +7,7 @@ pub struct Request<
     TResult: Send + Sync + 'static,
     TError: Send + Sync + 'static,
 > {
-    pub request_data: TItem,
+    pub request_data: Vec<TItem>,
     pub completion: TaskCompletion<TResult, Arc<TError>>,
     #[cfg(feature = "with-telemetry")]
     pub my_telemetry: my_telemetry::MyTelemetryContext,
@@ -34,11 +34,11 @@ impl<
         requests: Vec<Request<TItem, TResult, TError>>,
         #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
     ) -> Self {
-        let mut data = Vec::with_capacity(requests.len());
+        let mut data = Vec::new();
         let mut completions = Vec::with_capacity(requests.len());
 
         for request in requests {
-            data.push(request.request_data);
+            data.extend(request.request_data);
             completions.push(request.completion);
         }
 

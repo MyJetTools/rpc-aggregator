@@ -91,7 +91,7 @@ impl<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> RpcAggregator<
         }
 
         let mut event = Request {
-            request_data: data,
+            request_data: vec![data],
             completion: TaskCompletion::new(),
             #[cfg(feature = "with-telemetry")]
             my_telemetry,
@@ -121,8 +121,8 @@ impl<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> RpcAggregator<
 
     pub async fn execute_multi_requests(
         &self,
-        #[cfg(feature = "with-telemetry")] data: Vec<(TItem, my_telemetry::MyTelemetryContext)>,
-        #[cfg(not(feature = "with-telemetry"))] data: Vec<TItem>,
+        data: Vec<TItem>,
+        #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
     ) -> Result<(), BTreeMap<usize, Arc<TError>>> {
         if self.app_states.is_shutting_down() {
             panic!(
@@ -136,32 +136,17 @@ impl<TItem: Send + Sync + 'static, TError: Send + Sync + 'static> RpcAggregator<
         {
             let mut write_access = self.inner.0.lock().await;
 
-            #[cfg(feature = "with-telemetry")]
-            for (data, my_telemetry) in data {
-                let mut event = Request {
-                    request_data: data,
-                    completion: TaskCompletion::new(),
-                    my_telemetry,
-                };
+            let mut event = Request {
+                request_data: data,
+                completion: TaskCompletion::new(),
+                #[cfg(feature = "with-telemetry")]
+                my_telemetry,
+            };
 
-                let task_await = event.completion.get_awaiter();
-                write_access.queue.push(event);
+            let task_await = event.completion.get_awaiter();
+            write_access.queue.push(event);
 
-                awaiters.push(task_await)
-            }
-
-            #[cfg(not(feature = "with-telemetry"))]
-            for data in data {
-                let mut event = Request {
-                    request_data: data,
-                    completion: TaskCompletion::new(),
-                };
-
-                let task_await = event.completion.get_awaiter();
-                write_access.queue.push(event);
-
-                awaiters.push(task_await)
-            }
+            awaiters.push(task_await);
 
             self.inner.1.store(
                 write_access.queue.len(),
