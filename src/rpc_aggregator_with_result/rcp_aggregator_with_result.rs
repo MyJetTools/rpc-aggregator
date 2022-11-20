@@ -114,6 +114,10 @@ impl<
         {
             let mut write_access = self.inner.0.lock().await;
 
+            if write_access.receiver.is_some() {
+                panic!("Rcp aggregator {} is not started", self.name);
+            }
+
             write_access.queue.push(event);
             self.inner.1.store(
                 write_access.queue.len(),
@@ -136,8 +140,8 @@ impl<
     pub async fn execute_request_with_transformation<TOut, TFn: Fn(TResult) -> TOut>(
         &self,
         data: TItem,
-        tranform: TFn,
         #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
+        tranform: TFn,
     ) -> Result<TOut, Arc<TError>> {
         let result = self
             .execute_request(
@@ -173,6 +177,11 @@ impl<
 
         {
             let mut write_access = self.inner.0.lock().await;
+
+            if write_access.receiver.is_some() {
+                panic!("Rcp aggregator {} is not started", self.name);
+            }
+
             write_access.queue.push(event);
             self.inner.1.store(
                 write_access.queue.len(),
@@ -193,8 +202,8 @@ impl<
     pub async fn execute_multi_requests_with_transofrmation<TOut, TFn: Fn(TResult) -> TOut>(
         &self,
         data: Vec<TItem>,
-        tranform: TFn,
         #[cfg(feature = "with-telemetry")] my_telemetry: my_telemetry::MyTelemetryContext,
+        tranform: TFn,
     ) -> Result<Vec<TOut>, Arc<TError>> {
         let response = self
             .execute_multi_requests(
