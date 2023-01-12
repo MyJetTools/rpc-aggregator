@@ -13,5 +13,5 @@ with-telemetry = ["my-telemetry"]
 [dependencies]
 tokio = { version = "*", features = ["full"] }
 async-trait = "*"
-rust-extensions = { tag = "0.1.2", git = "https://github.com/MyJetTools/rust-extensions.git" }
+rust-extensions = { tag = "0.1.3", git = "https://github.com/MyJetTools/rust-extensions.git" }
 my-telemetry = { tag = "0.3.0", git = "https://github.com/MyJetTools/my-telemetry.git", optional = true }
